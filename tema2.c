@@ -218,7 +218,7 @@ static void saveFile(Client* c, int file_index)
 }
 
 // used by seed or peer. get a SEG_REQ from other clients(asks for segment i from file j)
-static void* upload_thread_func(void* arg)
+void* upload_thread_func(void* arg)
 {
     Client* c = (Client*)arg;
     // we don t have the final signal from tracker
@@ -250,7 +250,7 @@ static void* upload_thread_func(void* arg)
         strcpy(resp, "NO");
         if (ok != -1) {
             // valid index
-            if (segIndex >= 0 && segIndex < c->haveFiles[ok].numSegments) {
+            if (segIndex >= 0 && segIndex < c->haveFiles[ok].numSegments && c->haveFiles[ok].segments[segIndex].hash[0] != '\0') {
                 // we have index
                 strcpy(resp, "OK");
             }
@@ -316,6 +316,13 @@ static void* download_thread_func(void* arg)
         // contor for downloaded segments
         int counter = 0;
         // download segment
+        // actualizez fisierele pe care le am
+        c->numFilesHave++;
+        strcpy(c->haveFiles[c->numFilesHave-1].filename, localFile.filename);
+        c->haveFiles[c->numFilesHave-1].numSegments = localFile.numSegments;
+        for (int i = 0; i < localFile.numSegments; i++) {
+            c->haveFiles[c->numFilesHave - 1].segments[i].hash[0] = '\0';
+        }
         for (int segment = 0; segment < numSeg; segment++) {
             int ok = 0;
             // load seeds/peers in a ciclic way for eficiency
@@ -327,9 +334,11 @@ static void* download_thread_func(void* arg)
 
                 char resp[10];
                 MPI_Recv(resp, 10, MPI_CHAR, srank, TAG_SEG_RSP, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-                // got a valid response
+                // got a valid response, so increment the counter
                 if (strcmp(resp, "OK") == 0) {
                     ok = 1;
+                    counter++;
+                    strcpy(c->haveFiles[c->numFilesHave - 1].segments[segment].hash, localFile.segments[segment].hash);
                     break;
                 }
             }
@@ -524,11 +533,12 @@ void tracker(int numtasks, int rank)
                     MPI_Send(tfiles[found].seeds, seeds_count, MPI_INT, src, TAG_FILE_INFO, MPI_COMM_WORLD);
                 }
             }
-        }  else {
-            MPI_Recv(NULL, 0, MPI_BYTE, src, tag, MPI_COMM_WORLD, &st);
-        }
+         }
+        //  else {
+        //     MPI_Recv(NULL, 0, MPI_BYTE, src, tag, MPI_COMM_WORLD, &st);
+        // }
 
-        // check 
+        // check , in order to inform the tracker when the process is over
         finished = 0;
         for (int c = 1; c < numtasks; c++) {
             if (doneClients[c]) {
