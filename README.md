@@ -1,71 +1,45 @@
-  Margheanu Cristina-Andreea 333CA
+  BitTorrent Protocol
 
-  Pentru utilizarea logicii MPI am creat 10 tag-uri cu care voi lucra în timpul
-procesului de trimitere și primire a mesajelor intre clienti si tracker.
+For using MPI logic I created 10 tags that I will work with during the process of sending and receiving messages between clients and tracker.
 
-  Primul pas pentru pornirea programului constă în analizarea și gestionarea 
-lucrului cu fisierele. Pentru a face acest lucru am creat 3 structuri: pentru
-segmente (pentru a păstra hashurile împreună), pentru fișiere singulare și pentru
-fișierele clientului în general, pentru a urmări fisierele pe care le avem si pe 
-cele pe care le dorim. Deci, pentru a analiza fișierele de intrare stocate in in<R>.txt
-am folosit funcția parsefile care preia numele fișierului și returnează un constructor de
-fișier cu toate caracteristicile necesare, pornind de la deschiderea fișierului și mergând
-până la alocare memorie pentru elemente și efectuarea verificărilor împotriva erorilor.
-Pentru a salva fișiere în formatul solicitat am creat o funcție care a reunit
-lista ordonată a segmentelor de hashuri. 
-  Pentru primul pas de inițializare a clientului am citit fișierul de intrare și am salvat
-informatiile de acolo in structura clientului.
+The first step to start the program is to analyze and manage the work with files. To do this I created 3 structures: for segments (to keep hashes together),
+for single files and for client files in general, to keep track of the files we have and the ones we want. So, to analyze the input files stored in in<R>.txt
+I used the parsefile function that takes the file name and returns a file constructor with all the necessary features, starting from opening the file and going
+to allocating memory for elements and performing checks against errors.To save files in the requested format I created a function that brought together the ordered
+list of hash segments.For the first step of client initialization, we read the input file and saved the information from there in the client structure.
 
-  În funcția de upload, utilizată de seeds sau peers, este așteptat un TAG_SEG_REQ de la alti
-clienti care au nevoie de segmente. Aceasta ruleaza pana cand clientul primeste semnalul final
-de la tracker. Este folosit un TAG_SEG_RSP, care poate semnala succesul sau finalizarea
-nereușită a procesului. Dacă nu am primit mesajul că totul este finalizat din tracker, așteptăm
-o solicitare de la alt client. Pentru aceasta, folosim MPI_iprobe pentru a verifica dacă există
-un mesaj disponibil la cererea de segment. Dacă mesajul nu este disponibil,
-indicatorul rămâne 0. În caz contrar, statusul va conține informații despre mesaj. În continuare, 
-primim informații despre numele de fișier și indexul segmentului solicitat de client.
-Apoi trimitem mesajul pozitiv sau negativ, în funcție de rezultat (indiferent dacă avem
-sau nu un index valid). Astfel, functia verifica daca exista cereri si daca segmentul cerut este 
-disponibil.
+In the upload function, used by seeds or peers, a TAG_SEG_REQ is expected from other clients that need segments. This runs until the client receives the final
+signal from the tracker. A TAG_SEG_RSP is used, which can signal the success or failure of the process. If we have not received the message that everything is
+completed from the tracker, we wait for a request from another client. For this, we use MPI_iprobe to check if there is a message available for the segment request.
+If the message is not available, the indicator remains 0. Otherwise, the status will contain information about the message. Next, we receive information about the
+filename and index of the segment requested by the client.Then we send the positive or negative message, depending on the result (regardless of whether we have a
+valid index or not). Thus, the function checks if there are requests and if the requested segment is available.
 
-  Continuăm cu threadul de descărcare în care, ca a doua parte a inițializării clientului,
-clientul care deține un fișier trimite tracker-ului numărul de segmente și hash-ul fiecăruia.
-În acest fel, tracker-ul știe care sunt fișierele din sistem, numărul de segmente,
-hashes și cine le are la început. Așteptăm un răspuns ACK de la tracker.
-Apoi, pentru fișierele pe care un client le solicită avem nevoie de numărul de
-segmente ale acestuia și de hash-ul fiecăruia. Astept informatii despre lista clientilro.
-Caut fișierul, păstrez datele despre acesta și actualizați lista de seeds/peers. 
-Pentru simularea descarcarii folosesc un localFile  pentru un fisier dorit. Pun
-în el numele fisierului, numarul de segmente si hashurile lor. Inainte de descarcarea
-segmentelor introduc fisierul ca si cum l-as avea partial il lista fisierelor si cand
-primesc un segment copiez segmentul pe care il stiu ca si cum as marca ca l-am primit.
-La final după descarcarea segmentelor, verific daca am toate segementele valide deci
-localFile pot sa-l salvez. Pentru a-l face mai eficient, am folosit o tehnică de distribuire
-într-o manieră ciclică în funcția de descărcare. Pentru fiecare segment, parcurgem clienții
-care dețin fișierul într-o ordine ciclică. Astfel, fiecare client primește cereri
-de segmente  și descărcarea unui fișier nu se face în întregime din 
-aceleasi seeds .Pentru a vedea dacă descărcarea este finalizată, verific cate segmente am.
-Dacă numărul de segmente ale fișierului obținut este egal cu cel real al fisierul pe care
-l-am dorit, inseamna ca totul a fost finalizat cu succes. 
-La sfârșitul descărcării, pot considerați fișierul ca deținut, informez trackerul și salvez
-fisierul în formatul cerut. Cand am terminat de descarcat toate fisierele trimitem tagul
-TAG_ALL_DONE trackerului si inchidem threadul de download
-actualizand campul din structura client de finalizare a downloadarii cu 1.
-  Pentru mecanismul de actualizare, in functia de download dupa ce descarc 10
-fisiere cer trackerului lista actualizata de seeds/peers apoi continui cu descarcarea.
-In tracker abordez si cazul cu tag-ul TAG_WANT_UPDATE, unde este trimisa o lista actualizata de
-seeds sau peers.
+We continue with the download thread in which, as the second part of the client initialization,
+the client that owns a file sends the tracker the number of segments and the hash of each one.
+In this way, the tracker knows which files are in the system, the number of segments,
+hashes and who has them in the first place. We wait for an ACK response from the tracker.
+Then, for the files that a client requests, we need the number of its segments and the hash of each one. I wait for information about the list of clients.
+I search for the file, keep data about it and update the list of seeds/peers.
+To simulate the download, I use a localFile for a desired file. I put in it the name of the file, the number of segments and their hashes. Before downloading
+the segments, I insert the file as if I had it partially in the file list and when I receive a segment, I copy the segment that I know as if I marked it as received.
+Finally, after downloading the segments, I check if I have all the valid segments so that I can save it to localFile. To make it more efficient, I used a distribution
+technique in a cyclic manner in the download function. For each segment, we go through the clients that own the file in a cyclic order. Thus, each client receives
+requests for segments and the download of a file is not entirely from the same seeds. To see if the download is complete, I check how many segments I have. 
+If the number of segments of the file obtained is equal to the actual number of the file that I wanted, it means that everything was completed successfully.
+At the end of the download, I can consider the file as owned, inform the tracker and save the file in the requested format. When I have finished downloading
+all the files, I send the tag TAG_ALL_DONE to the tracker and close the download thread by updating the field in the client structure for the completion of the
+download with 1. For the update mechanism, in the download function after downloading 10 files I ask the tracker for the updated list of seeds/peers and then continue
+downloading. In the tracker I also address the case with the tag TAG_WANT_UPDATE, where an updated list of seeds or peers is sent.
 
-  Ca tracker, am folosit structura Tracker, care deține informații
-despre fisiere: numarul de segmente, lista clientilor care au
-segmente. In cadrul rezolvarii am lucrat cu o singura lista de 
-clienti pe care am numit-o seeds, pe care o parcurg ciclic, dar pe care o actualizez 
-atunci cand un proces anunta ca vrea sa downloadeze un anumit fisier si cere lista 
-trackerului(TAG_WANT_FILE), trackerul il include si pe el in lista. 
-Ca initializare a acestuia primesc mesajul initial al fiecarui client si il adaug
-ulterior la lista de seeds. Trackerul verifica daca fisierul curent (cu numele fname) exista
-deja in lista de fisiere. Acum dupa ce vedem ce mesaj a primit, in functie de tipul tagului,
-urmez indicatiile de primire a mesajelor de la clienti. Pentru situatia in care avem finalizarea
-descarcarii unui fisier adaugam clientul in lista si il marcam ca si seed daca nu este deja acolo,
-verificam cu o variabila duplicate(pentru duplicare).
-  In peer asigur oprirea procesului , iar trackerul notifica toti clientii cand totul este finalizat.
+As a tracker, I used the Tracker structure, which holds information
+about files: the number of segments, the list of clients that have
+segments. In the solution, I worked with a single list of clients that I called seeds, which I cycle through, but which I update
+when a process announces that it wants to download a certain file and asks for the
+tracker's list (TAG_WANT_FILE), the tracker also includes it in the list.
+As its initialization, I receive the initial message of each client and add it
+later to the list of seeds. The tracker checks whether the current file (with the name fname) already exists
+in the file list. Now after we see what message it received, depending on the type of tag,
+I follow the instructions for receiving messages from clients. For the situation where we have the completion of a file download, we add the client to the list
+and mark it as a seed if it is not already there, we check with a duplicate variable (for duplication). In peer, we ensure the process is stopped, and the tracker
+notifies all clients when everything is completed.
